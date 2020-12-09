@@ -1,17 +1,21 @@
-## 作业
+package main
 
-1.基于 errgroup 实现一个 http server 的启动和关闭 ，以及 linux signal 信号的注册和处理，要保证能够 一个退出，全部注销退出。
+import (
+	"context"
+	"errors"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
+	"golang.org/x/sync/errgroup"
+)
 
-
-## 解答
-
-1、通过errgroup启动一个http server，监听8080端口。
-
-```go
-done := make(chan struct{})
-eg, ctx := errgroup.WithContext(context.Background())
-eg.Go(func() error {
+func main() {
+	done := make(chan struct{})
+	eg, ctx := errgroup.WithContext(context.Background())
+	eg.Go(func() error {
 		handler := http.NewServeMux()
 		handler.HandleFunc("/close", func(writer http.ResponseWriter, request *http.Request) {
 			log.Println("get request close")
@@ -36,13 +40,9 @@ eg.Go(func() error {
 			}
 		}()
 		return server.ListenAndServe()
-})
-```
+	})
 
-2、通过errgroup监听linux的信号。
-
-```go
-eg.Go(func() error {
+	eg.Go(func() error {
 		sig := make(chan os.Signal, 1)
 		signal.Notify(sig, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT)
 		select {
@@ -52,9 +52,8 @@ eg.Go(func() error {
 			log.Println("by http close")
 			return ctx.Err()
 		}
-})
-```
+	})
 
-3、可以通过向程序发送SIGQUIT， SIGTERM， SIGINT触发关闭操作，实现全部注销。
-
-4、可以通过请求http://127.0.0.1:8080/close，触发关闭操作，实现全部注销。
+	err := eg.Wait()
+	log.Println("errgroup get error:", err)
+}

@@ -11,7 +11,7 @@
 ```go
 done := make(chan struct{})
 eg, ctx := errgroup.WithContext(context.Background())
-	eg.Go(func() error {
+eg.Go(func() error {
 		handler := http.NewServeMux()
 		handler.HandleFunc("/close", func(writer http.ResponseWriter, request *http.Request) {
 			log.Println("get request close")
@@ -63,7 +63,7 @@ eg.Go(func() error {
 			log.Println("signal goroutine by http close")
 			return ctx.Err()
 		}
-	}
+}
 ```
 
 3、可以通过向程序发送SIGQUIT， SIGTERM， SIGINT触发关闭操作，实现全部注销。

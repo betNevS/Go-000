@@ -11,7 +11,7 @@
 ```go
 done := make(chan struct{})
 eg, ctx := errgroup.WithContext(context.Background())
-eg.Go(func() error {
+	eg.Go(func() error {
 		handler := http.NewServeMux()
 		handler.HandleFunc("/close", func(writer http.ResponseWriter, request *http.Request) {
 			log.Println("get request close")
@@ -28,21 +28,25 @@ eg.Go(func() error {
 			Addr:    ":8080",
 			Handler: handler,
 		}
-		closing := make(chan error)
-		go func() {
+		httpEg, httpCtx := errgroup.WithContext(context.Background())
+		httpEg.Go(func() error {
 			select {
 			case <-ctx.Done():
 				log.Println("shutdown by quit signal")
 			case <-done:
 				log.Println("shutdown by close request")
+			case <-httpCtx.Done():
+				log.Println("http server error")
+				return errors.New("http server error")
 			}
 			timeoutContext, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
-			closing <- server.Shutdown(timeoutContext)
-		}()
-		err := server.ListenAndServe()
-		<-closing
-		return err
+			return server.Shutdown(timeoutContext)
+		})
+		httpEg.Go(func() error {
+			return server.ListenAndServe()
+		})
+		return httpEg.Wait()
 })
 ```
 
@@ -59,7 +63,7 @@ eg.Go(func() error {
 			log.Println("signal goroutine by http close")
 			return ctx.Err()
 		}
-	})
+	}
 ```
 
 3、可以通过向程序发送SIGQUIT， SIGTERM， SIGINT触发关闭操作，实现全部注销。

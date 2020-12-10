@@ -20,10 +20,15 @@ eg.Go(func() error {
 		handler.HandleFunc("/hello", func(writer http.ResponseWriter, request *http.Request) {
 			writer.Write([]byte("Hello"))
 		})
+		handler.HandleFunc("/long", func(writer http.ResponseWriter, request *http.Request) {
+			time.Sleep(10 * time.Second)
+			writer.Write([]byte("sleep complete"))
+		})
 		server := &http.Server{
 			Addr:    ":8080",
 			Handler: handler,
 		}
+		closing := make(chan error)
 		go func() {
 			select {
 			case <-ctx.Done():
@@ -31,11 +36,13 @@ eg.Go(func() error {
 			case <-done:
 				log.Println("shutdown by close request")
 			}
-			if err := server.Shutdown(context.Background()); err != nil {
-				log.Println("shut down error: ", err)
-			}
+			timeoutContext, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			closing <- server.Shutdown(timeoutContext)
 		}()
-		return server.ListenAndServe()
+		err := server.ListenAndServe()
+		<-closing
+		return err
 })
 ```
 
@@ -49,12 +56,13 @@ eg.Go(func() error {
 		case <-sig:
 			return errors.New("get quit signal")
 		case <-ctx.Done():
-			log.Println("by http close")
+			log.Println("signal goroutine by http close")
 			return ctx.Err()
 		}
-})
+	})
 ```
 
 3、可以通过向程序发送SIGQUIT， SIGTERM， SIGINT触发关闭操作，实现全部注销。
 
-4、可以通过请求http://127.0.0.1:8080/close，触发关闭操作，实现全部注销。
+4、可以通过请求`http://127.0.0.1:8080/close`，触发关闭操作，实现全部注销。
+

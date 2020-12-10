@@ -33,21 +33,25 @@ func main() {
 			Addr:    ":8080",
 			Handler: handler,
 		}
-		closing := make(chan error)
-		go func() {
+		httpEg, httpCtx := errgroup.WithContext(context.Background())
+		httpEg.Go(func() error {
 			select {
 			case <-ctx.Done():
 				log.Println("shutdown by quit signal")
 			case <-done:
 				log.Println("shutdown by close request")
+			case <-httpCtx.Done():
+				log.Println("http server error")
+				return errors.New("http server error")
 			}
 			timeoutContext, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
-			closing <- server.Shutdown(timeoutContext)
-		}()
-		err := server.ListenAndServe()
-		<-closing
-		return err
+			return server.Shutdown(timeoutContext)
+		})
+		httpEg.Go(func() error {
+			return server.ListenAndServe()
+		})
+		return httpEg.Wait()
 	})
 
 	eg.Go(func() error {
@@ -63,5 +67,5 @@ func main() {
 	})
 
 	err := eg.Wait()
-	log.Println("errgroup get error:", err)
+	log.Println("server ending: ", err)
 }

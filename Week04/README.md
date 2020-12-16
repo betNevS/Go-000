@@ -6,3 +6,26 @@
 
 ## 解答
 
+目录结构：
+
+```
+├── README.md
+├── api
+│   └── user
+│       └── v1
+│           ├── user.pb.go
+│           ├── user.proto
+│           └── user_grpc.pb.go
+├── bin
+├── cmd
+│   └── server
+│       └── main.go
+├── go.mod
+├── internal
+│   ├── biz
+│   ├── dao
+│   ├── data
+│   └── service
+└── note.md
+```
+
